@@ -1,4 +1,4 @@
-"""Driver for TrippLite UPS battery backups."""
+"""Driver for TrippLite UPS battery backups.   Only tested on SMART1500LCDXL(?)"""
 import hid
 
 vendor_id = 0x09ae
@@ -76,15 +76,23 @@ structure = {
 class Battery(object):
     """Driver for TrippLite UPS battery backups."""
 
-    def __init__(self, product_id=None):
+    def __init__(self, product_id=None, serial=None):
         """Connect to the device.
 
         Args:
-            product_id (Optional): The HID product ID of the UPS. Only needed
-                if multiple TrippLite HID devices are connected.
+            product_id (Optional): The HID product ID of the UPS.  If omitted,
+                all devices will be scanned and the first one will be selected.
+            serial (Optional): The serial number of a specific UPS.  If used,
+                product_id is not required.
         """
         self.device = hid.device()
-        self.product_id = product_id or self._get_product_id()
+        if (serial)
+            self.product_id = self._get_product_id_by_serial(serial)
+        elif (product_id)
+            self.product_id = product_id
+        else
+            self.product_id = self._get_product_id_greedy()
+        self.serial = serial
 
     def __enter__(self):
         """Provide entrance to context manager."""
@@ -97,16 +105,20 @@ class Battery(object):
 
     def open(self):
         """Open connection to the device."""
-        self.device.open(vendor_id, self.product_id)
+        if (self.serial)
+            self.device.open(vendor_id, self.product_id, self.serial)
+        else
+            self.device.open(vendor_id, self.product_id)
 
     def close(self):
         """Close connection to the device."""
         self.device.close()
 
-    def _get_product_id(self):
+    def _get_product_id_greedy(self):
         """Search through connected HID devices to find the TrippLite UPS.
 
-        This assumes that only one TrippLite is connected to the computer.
+        This will return the first TrippLite device found, regardless of how
+        many are connected.
         """
         try:
             return next(d['product_id'] for d in hid.enumerate()
@@ -114,6 +126,16 @@ class Battery(object):
         except StopIteration:
             raise IOError("Could not find any connected TrippLite devices.")
 
+    def _get_product_id_by_serial(self, serial):
+        """Search through connected HID devices to find the TrippLite UPS with
+        the specified serial number.
+        """
+        try:
+            return next(d['product_id'] for d in hid.enumerate()
+                        if d['vendor_id'] == vendor_id
+                        and d['serial'] == serial)
+        except StopIteration:
+            raise IOError("Could not find TrippLite device with given serial.")
     def get(self):
         """Return an object containing all available data."""
         output = {}
